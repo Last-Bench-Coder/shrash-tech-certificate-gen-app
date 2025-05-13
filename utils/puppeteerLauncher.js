@@ -1,22 +1,23 @@
+// utils/puppeteerLauncher.js
 const chromium = require('chrome-aws-lambda');
+let puppeteer = null;
 
 async function launchBrowser() {
-  if (process.env.AWS_EXECUTION_ENV || process.env.VERCEL) {
-    // Running on AWS Lambda / Vercel
-    const browser = await chromium.puppeteer.launch({
+  if (process.env.AWS_EXECUTION_ENV) {
+    // Lambda environment
+    return await chromium.puppeteer.launch({
       args: chromium.args,
       executablePath: await chromium.executablePath,
       headless: chromium.headless,
     });
-    return browser;
   } else {
-    // Running locally
-    const puppeteer = require('puppeteer');
-    const browser = await puppeteer.launch({
+    // Local development
+    if (!puppeteer) puppeteer = require('puppeteer-core');
+    return await puppeteer.launch({
       headless: true,
+      executablePath: '/usr/bin/google-chrome', // or where your Chrome is installed
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
-    return browser;
   }
 }
 
