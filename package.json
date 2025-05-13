@@ -1,13 +1,14 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Express certificate backend with HTML-to-PDF, QR code, and email functionality",
+  "main": "api/server.js",
   "scripts": {
+    "start": "node api/server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["express", "pdf", "certificate", "mongoose", "vercel"],
+  "author": "Your Name",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
