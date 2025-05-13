@@ -1,7 +1,7 @@
 const fs = require('fs-extra');
 const path = require('path');
 const handlebars = require('handlebars');
-const puppeteer = require('puppeteer');
+const chromium = require('chrome-aws-lambda');
 
 async function generateCertificatePDF(data) {
   const templatePath = path.join(__dirname, '../templates/certificateTemplate.html');
@@ -9,7 +9,12 @@ async function generateCertificatePDF(data) {
   const template = handlebars.compile(templateHtml);
   const html = template(data);
 
-  const browser = await puppeteer.launch();
+  const browser = await chromium.puppeteer.launch({
+    args: chromium.args,
+    executablePath: await chromium.executablePath || undefined,
+    headless: chromium.headless,
+  });
+
   const page = await browser.newPage();
   await page.setContent(html, { waitUntil: 'networkidle0' });
 
