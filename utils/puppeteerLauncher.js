@@ -1,10 +1,9 @@
-// utils/puppeteerLauncher.js
 const chromium = require('chrome-aws-lambda');
 let puppeteer = null;
 
 async function launchBrowser() {
-  if (process.env.AWS_EXECUTION_ENV) {
-    // Lambda environment
+  if (process.env.VERCEL) {
+    // Vercel environment
     return await chromium.puppeteer.launch({
       args: chromium.args,
       executablePath: await chromium.executablePath,
