@@ -9,7 +9,7 @@ const Certificate = require('../models/Certificate');
 const GeneratedCertificate = require('../models/GeneratedCertificate');
 const EmailStatus = require('../models/EmailStatus');
 const { sendCertificateEmail } = require('../utils/emailSender');
-const chromium = require('chrome-aws-lambda');
+const launchBrowser = require('../utils/puppeteerLauncher');
 
 // Utility function to populate template
 function populateTemplate(html, data) {
@@ -91,11 +91,7 @@ router.get('/:id/download', async (req, res) => {
     });
     await generatedCertificate.save();
 
-    const browser = await chromium.puppeteer.launch({
-      args: chromium.args,
-      executablePath: await chromium.executablePath || undefined,
-      headless: chromium.headless,
-    });
+    const browser = await launchBrowser();
     const page = await browser.newPage();
     await page.setContent(populatedHTML, { waitUntil: 'networkidle0' });
     const pdfBuffer = await page.pdf({ format: 'A4' });
@@ -119,11 +115,7 @@ router.post('/:id/send', async (req, res) => {
     const htmlTemplate = fs.readFileSync(path.join(__dirname, '../templates/certificateTemplate.html'), 'utf8');
     const populatedHTML = populateTemplate(htmlTemplate, certificate);
 
-    const browser = await chromium.puppeteer.launch({
-      args: chromium.args,
-      executablePath: await chromium.executablePath || undefined,
-      headless: chromium.headless,
-    });
+    const browser = await launchBrowser();
     const page = await browser.newPage();
     await page.setContent(populatedHTML, { waitUntil: 'networkidle0' });
     const pdfBuffer = await page.pdf({ format: 'A4' });
