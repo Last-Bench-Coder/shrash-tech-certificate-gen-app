@@ -9,7 +9,7 @@ const Certificate = require('../models/Certificate');
 const GeneratedCertificate = require('../models/GeneratedCertificate');
 const EmailStatus = require('../models/EmailStatus');
 const { sendCertificateEmail } = require('../utils/emailSender');
-const launchBrowser = require('../utils/puppeteerLauncher');
+const { chromium } = require('playwright'); // Use Playwright
 
 // Utility function to populate template
 function populateTemplate(html, data) {
@@ -91,7 +91,10 @@ router.get('/:id/download', async (req, res) => {
     });
     await generatedCertificate.save();
 
-    const browser = await launchBrowser();
+    const browser = await chromium.launch({
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      headless: true,
+    });
     const page = await browser.newPage();
     await page.setContent(populatedHTML, { waitUntil: 'networkidle0' });
     const pdfBuffer = await page.pdf({ format: 'A4' });
@@ -115,7 +118,10 @@ router.post('/:id/send', async (req, res) => {
     const htmlTemplate = fs.readFileSync(path.join(__dirname, '../templates/certificateTemplate.html'), 'utf8');
     const populatedHTML = populateTemplate(htmlTemplate, certificate);
 
-    const browser = await launchBrowser();
+    const browser = await chromium.launch({
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      headless: true,
+    });
     const page = await browser.newPage();
     await page.setContent(populatedHTML, { waitUntil: 'networkidle0' });
     const pdfBuffer = await page.pdf({ format: 'A4' });
