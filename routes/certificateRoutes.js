@@ -1,0 +1,194 @@
+const express = require('express');
+const router = express.Router();
+const fs = require('fs');
+const path = require('path');
+const dotenv = require('dotenv');
+dotenv.config();
+
+const Certificate = require('../models/Certificate');
+const GeneratedCertificate = require('../models/GeneratedCertificate');  // Updated model
+const EmailStatus = require('../models/EmailStatus');  // EmailStatus model
+const { sendCertificateEmail } = require('../utils/emailSender');
+const puppeteer = require('puppeteer');
+
+// Utility function to populate template
+function populateTemplate(html, data) {
+  return html
+    .replace(/{{studentName}}/g, data.studentName)
+    .replace(/{{courseName}}/g, data.courseName)
+    .replace(/{{date}}/g, new Date(data.date).toLocaleDateString())
+    .replace(/{{certificateId}}/g, data.certificateId)
+    .replace(/{{instituteName}}/g, data.instituteName || 'Shrash Tech Academy')
+    .replace(/{{instituteAddress}}/g, data.instituteAddress || '123 Main St, City, Country')
+    .replace(/{{logo}}/g, data.instituteLogo || process.env.LOGO_IMAGE_URL)
+    .replace(/{{signatureName}}/g, data.signatureName || process.env.SIGNATURE);
+}
+
+// POST route for creating a certificate
+router.post('/', async (req, res) => {
+  try {
+    const {
+      studentName,
+      courseName,
+      date,
+      email,
+      phone,
+      instituteName,
+      instituteAddress,
+      institutePhone,
+      instituteEmail,
+      instituteLogo,
+      signatureName
+    } = req.body;
+
+    const certificateId = Date.now().toString();
+
+    const certificate = new Certificate({
+      studentName,
+      courseName,
+      date,
+      email,
+      phone,
+      instituteName,
+      instituteAddress,
+      institutePhone,
+      instituteEmail,
+      instituteLogo,
+      signatureName,
+      certificateId
+    });
+
+    // Save the certificate to the database
+    await certificate.save();
+
+    // Respond with the created certificate
+    res.status(201).json(certificate);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// GET all certificates
+router.get('/', async (req, res) => {
+  try {
+    const certificates = await Certificate.find();
+    res.json(certificates);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// GET route to download a certificate as PDF
+router.get('/:id/download', async (req, res) => {
+  try {
+    const certificate = await Certificate.findById(req.params.id);
+    if (!certificate) return res.status(404).send('Certificate not found');
+
+    const htmlTemplate = fs.readFileSync(path.join(__dirname, '../templates/certificateTemplate.html'), 'utf8');
+    const populatedHTML = populateTemplate(htmlTemplate, certificate);
+
+    // Save the populated HTML content for tracking
+    const generatedCertificate = new GeneratedCertificate({
+      studentId: certificate._id,
+      certificateId: certificate.certificateId,
+      htmlContent: populatedHTML
+    });
+    await generatedCertificate.save();
+
+    const browser = await puppeteer.launch();
+    const page = await browser.newPage();
+    await page.setContent(populatedHTML, { waitUntil: 'networkidle0' });
+    const pdfBuffer = await page.pdf({ format: 'A4' });
+    await browser.close();
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=certificate-${certificate._id}.pdf`);
+    res.send(pdfBuffer);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+// POST route to email the certificate as PDF
+router.post('/:id/send', async (req, res) => {
+  try {
+    const certificate = await Certificate.findById(req.params.id);
+    if (!certificate) return res.status(404).send('Certificate not found');
+
+    const htmlTemplate = fs.readFileSync(path.join(__dirname, '../templates/certificateTemplate.html'), 'utf8');
+    const populatedHTML = populateTemplate(htmlTemplate, certificate);
+
+    const browser = await puppeteer.launch();
+    const page = await browser.newPage();
+    await page.setContent(populatedHTML, { waitUntil: 'networkidle0' });
+    const pdfBuffer = await page.pdf({ format: 'A4' });
+    await browser.close();
+
+    // Send the certificate email
+    await sendCertificateEmail(certificate.email, pdfBuffer);
+
+    // Log email status in the database as sent
+    const emailStatus = new EmailStatus({
+      email: certificate.email,
+      status: 'sent',
+      certificateId: certificate._id
+    });
+    await emailStatus.save();
+
+    // Save the HTML content after email is sent
+    const generatedCertificate = new GeneratedCertificate({
+      studentId: certificate._id,
+      certificateId: certificate.certificateId,
+      htmlContent: populatedHTML
+    });
+    await generatedCertificate.save();
+
+    res.send('Certificate emailed successfully.');
+  } catch (err) {
+    // Log failed email status in the database
+    const emailStatus = new EmailStatus({
+      email: certificate.email,
+      status: 'failed',
+      errorMessage: err.message,
+      certificateId: certificate._id
+    });
+    await emailStatus.save();
+
+    res.status(500).send(err.message);
+  }
+});
+
+// GET all email statuses
+router.get('/email-status', async (req, res) => {
+  try {
+    const emailStatuses = await EmailStatus.find();
+    res.json(emailStatuses);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// GET email statuses filtered by email
+router.get('/email-status', async (req, res) => {
+  try {
+    const { email } = req.query;  // Get the email from query params
+    const filter = email ? { email } : {};  // Filter by email if provided
+    
+    const emailStatuses = await EmailStatus.find(filter);
+    res.json(emailStatuses);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// GET all generated certificates (for tracking purposes)
+router.get('/generated-certificates', async (req, res) => {
+  try {
+    const generatedCertificates = await GeneratedCertificate.find();
+    res.json(generatedCertificates);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+module.exports = router;
