@@ -18,6 +18,10 @@ mongoose
   .then(() => console.log("MongoDB Connected"))
   .catch((err) => console.error(err));
 
+app.get("/", (req, res) => {
+  res.send("Welcome to the Certificate Generation API");
+});
+
 app.use("/images", express.static(path.join(__dirname, "images")));
 app.use("/api/certificates", certificateRoutes);
 
