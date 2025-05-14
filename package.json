@@ -5,8 +5,7 @@
   "main": "api/server.js",
   "scripts": {
     "start": "node api/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "postinstall": "npx playwright install"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
     "express",
@@ -22,14 +21,11 @@
     "body-parser": "^2.2.0",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
-    "ejs": "^3.1.10",
     "express": "^5.1.0",
     "fs-extra": "^11.3.0",
     "handlebars": "^4.7.8",
+    "html-pdf": "^3.0.1",
     "mongoose": "^8.14.2",
-    "nodemailer": "^7.0.3",
-    "pdfkit": "^0.17.1",
-    "qrcode": "^1.5.4",
-    "playwright": "^1.22.0"
+    "nodemailer": "^7.0.3"
   }
 }

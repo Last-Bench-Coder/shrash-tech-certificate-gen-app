@@ -6,10 +6,8 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 const Certificate = require('../models/Certificate');
-const GeneratedCertificate = require('../models/GeneratedCertificate');
 const EmailStatus = require('../models/EmailStatus');
 const { sendCertificateEmail } = require('../utils/emailSender');
-const { chromium } = require('playwright'); // Use Playwright
 
 // Utility function to populate template
 function populateTemplate(html, data) {
@@ -58,6 +56,12 @@ router.post('/', async (req, res) => {
       certificateId
     });
 
+    const htmlTemplate = fs.readFileSync(path.join(__dirname, '../templates/certificateTemplate.html'), 'utf8');
+    const populatedHTML = populateTemplate(htmlTemplate, certificate);
+
+    certificate.htmlContent = populatedHTML;
+    certificate.status = 'Created';
+
     await certificate.save();
     res.status(201).json(certificate);
   } catch (err) {
@@ -75,73 +79,28 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET route to download a certificate as PDF
-router.get('/:id/download', async (req, res) => {
-  try {
-    const certificate = await Certificate.findById(req.params.id);
-    if (!certificate) return res.status(404).send('Certificate not found');
-
-    const htmlTemplate = fs.readFileSync(path.join(__dirname, '../templates/certificateTemplate.html'), 'utf8');
-    const populatedHTML = populateTemplate(htmlTemplate, certificate);
-
-    const generatedCertificate = new GeneratedCertificate({
-      studentId: certificate._id,
-      certificateId: certificate.certificateId,
-      htmlContent: populatedHTML
-    });
-    await generatedCertificate.save();
-
-    const browser = await chromium.launch({
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      headless: true,
-    });
-    const page = await browser.newPage();
-    await page.setContent(populatedHTML, { waitUntil: 'networkidle0' });
-    const pdfBuffer = await page.pdf({ format: 'A4' });
-    await browser.close();
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=certificate-${certificate._id}.pdf`);
-    res.send(pdfBuffer);
-  } catch (err) {
-    res.status(500).send(err.message);
-  }
-});
-
 // POST route to email the certificate as PDF
 router.post('/:id/send', async (req, res) => {
   let certificate;
+
   try {
+    const { downloadURL } = req.body;
+
+    if (!downloadURL) {
+      return res.status(400).send('Download URL is required in the request body.');
+    }
+
     certificate = await Certificate.findById(req.params.id);
     if (!certificate) return res.status(404).send('Certificate not found');
 
-    const htmlTemplate = fs.readFileSync(path.join(__dirname, '../templates/certificateTemplate.html'), 'utf8');
-    const populatedHTML = populateTemplate(htmlTemplate, certificate);
-
-    const browser = await chromium.launch({
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      headless: true,
-    });
-    const page = await browser.newPage();
-    await page.setContent(populatedHTML, { waitUntil: 'networkidle0' });
-    const pdfBuffer = await page.pdf({ format: 'A4' });
-    await browser.close();
-
-    await sendCertificateEmail(certificate.email, pdfBuffer);
+    await sendCertificateEmail(certificate.email, downloadURL, certificate);
 
     const emailStatus = new EmailStatus({
       email: certificate.email,
       status: 'sent',
-      certificateId: certificate._id
+      certificateId: certificate._id,
     });
     await emailStatus.save();
-
-    const generatedCertificate = new GeneratedCertificate({
-      studentId: certificate._id,
-      certificateId: certificate.certificateId,
-      htmlContent: populatedHTML
-    });
-    await generatedCertificate.save();
 
     res.send('Certificate emailed successfully.');
   } catch (err) {
@@ -149,7 +108,7 @@ router.post('/:id/send', async (req, res) => {
       email: certificate?.email || 'unknown',
       status: 'failed',
       errorMessage: err.message,
-      certificateId: certificate?._id || 'unknown'
+      certificateId: certificate?._id || 'unknown',
     });
     await emailStatus.save();
 
@@ -164,16 +123,6 @@ router.get('/email-status', async (req, res) => {
     const filter = email ? { email } : {};
     const emailStatuses = await EmailStatus.find(filter);
     res.json(emailStatuses);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// GET all generated certificates
-router.get('/generated-certificates', async (req, res) => {
-  try {
-    const generatedCertificates = await GeneratedCertificate.find();
-    res.json(generatedCertificates);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
