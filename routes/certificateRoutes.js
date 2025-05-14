@@ -24,6 +24,7 @@ function populateTemplate(html, data) {
 
 // POST route for creating a certificate
 router.post('/', async (req, res) => {
+  console.log('First Step Certificate Creation');
   try {
     const {
       studentName,
@@ -36,7 +37,8 @@ router.post('/', async (req, res) => {
       institutePhone,
       instituteEmail,
       instituteLogo,
-      signatureName
+      signatureName,
+      htmlContent
     } = req.body;
 
     const certificateId = Date.now().toString();
@@ -54,17 +56,19 @@ router.post('/', async (req, res) => {
       instituteLogo,
       signatureName,
       certificateId,
-      htmlContent,
-      status
+      htmlContent
     });
+
+    
+    console.log(certificate);
 
     const htmlTemplate = fs.readFileSync(path.join(__dirname, '../templates/certificateTemplate.html'), 'utf8');
     const populatedHTML = populateTemplate(htmlTemplate, certificate);
 
     certificate.htmlContent = populatedHTML;
-    certificate.status = 'Created';
-
+    console.log(certificate.htmlContent);
     await certificate.save();
+    console.log('certificate created');
     res.status(201).json(certificate);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -82,56 +86,39 @@ router.get('/', async (req, res) => {
 });
 
 // POST route to email the certificate as PDF
-router.post('/', async (req, res) => {
+router.post('/:id/send', async (req, res) => {
+  let certificate;
+
   try {
-    const {
-      studentName,
-      courseName,
-      date,
-      email,
-      phone,
-      instituteName,
-      instituteAddress,
-      institutePhone,
-      instituteEmail,
-      instituteLogo,
-      signatureName
-    } = req.body;
+    const { downloadURL } = req.body;
 
-    const certificateId = Date.now().toString();
+    if (!downloadURL) {
+      return res.status(400).send('Download URL is required in the request body.');
+    }
 
-    // Create certificate instance without htmlContent and status
-    const certificate = new Certificate({
-      studentName,
-      courseName,
-      date,
-      email,
-      phone,
-      instituteName,
-      instituteAddress,
-      institutePhone,
-      instituteEmail,
-      instituteLogo,
-      signatureName,
-      certificateId
+    certificate = await Certificate.findById(req.params.id);
+    if (!certificate) return res.status(404).send('Certificate not found');
+
+    await sendCertificateEmail(certificate.email, downloadURL, certificate);
+
+    const emailStatus = new EmailStatus({
+      email: certificate.email,
+      status: 'sent',
+      certificateId: certificate._id,
     });
+    await emailStatus.save();
 
-    // Load template and populate HTML content
-    const htmlTemplate = fs.readFileSync(
-      path.join(__dirname, '../templates/certificateTemplate.html'),
-      'utf8'
-    );
-    const populatedHTML = populateTemplate(htmlTemplate, certificate);
-
-    // Now set htmlContent and status
-    certificate.htmlContent = populatedHTML;
-    certificate.status = 'Created';
-
-    await certificate.save();
-    res.status(201).json(certificate);
+    res.send('Certificate emailed successfully.');
   } catch (err) {
-    console.error('❌ Error creating certificate:', err);
-    res.status(500).json({ message: err.message });
+    const emailStatus = new EmailStatus({
+      email: certificate?.email || 'unknown',
+      status: 'failed',
+      errorMessage: err.message,
+      certificateId: certificate?._id || 'unknown',
+    });
+    await emailStatus.save();
+
+    res.status(500).send(err.message);
   }
 });
 
