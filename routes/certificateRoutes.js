@@ -53,7 +53,9 @@ router.post('/', async (req, res) => {
       instituteEmail,
       instituteLogo,
       signatureName,
-      certificateId
+      certificateId,
+      htmlContent,
+      status
     });
 
     const htmlTemplate = fs.readFileSync(path.join(__dirname, '../templates/certificateTemplate.html'), 'utf8');
