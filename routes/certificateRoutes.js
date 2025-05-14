@@ -82,39 +82,56 @@ router.get('/', async (req, res) => {
 });
 
 // POST route to email the certificate as PDF
-router.post('/:id/send', async (req, res) => {
-  let certificate;
-
+router.post('/', async (req, res) => {
   try {
-    const { downloadURL } = req.body;
+    const {
+      studentName,
+      courseName,
+      date,
+      email,
+      phone,
+      instituteName,
+      instituteAddress,
+      institutePhone,
+      instituteEmail,
+      instituteLogo,
+      signatureName
+    } = req.body;
 
-    if (!downloadURL) {
-      return res.status(400).send('Download URL is required in the request body.');
-    }
+    const certificateId = Date.now().toString();
 
-    certificate = await Certificate.findById(req.params.id);
-    if (!certificate) return res.status(404).send('Certificate not found');
-
-    await sendCertificateEmail(certificate.email, downloadURL, certificate);
-
-    const emailStatus = new EmailStatus({
-      email: certificate.email,
-      status: 'sent',
-      certificateId: certificate._id,
+    // Create certificate instance without htmlContent and status
+    const certificate = new Certificate({
+      studentName,
+      courseName,
+      date,
+      email,
+      phone,
+      instituteName,
+      instituteAddress,
+      institutePhone,
+      instituteEmail,
+      instituteLogo,
+      signatureName,
+      certificateId
     });
-    await emailStatus.save();
 
-    res.send('Certificate emailed successfully.');
+    // Load template and populate HTML content
+    const htmlTemplate = fs.readFileSync(
+      path.join(__dirname, '../templates/certificateTemplate.html'),
+      'utf8'
+    );
+    const populatedHTML = populateTemplate(htmlTemplate, certificate);
+
+    // Now set htmlContent and status
+    certificate.htmlContent = populatedHTML;
+    certificate.status = 'Created';
+
+    await certificate.save();
+    res.status(201).json(certificate);
   } catch (err) {
-    const emailStatus = new EmailStatus({
-      email: certificate?.email || 'unknown',
-      status: 'failed',
-      errorMessage: err.message,
-      certificateId: certificate?._id || 'unknown',
-    });
-    await emailStatus.save();
-
-    res.status(500).send(err.message);
+    console.error('❌ Error creating certificate:', err);
+    res.status(500).json({ message: err.message });
   }
 });
 
