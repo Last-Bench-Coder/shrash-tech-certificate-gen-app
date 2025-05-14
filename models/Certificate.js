@@ -13,7 +13,7 @@ const certificateSchema = new mongoose.Schema({
   instituteLogo: String,
   signatureName: String,
   certificateId: String,
-  htmlContent: { type: String, required: true },
+  htmlContent: { type: String },
   status: { type: String, default: "Created" },
   createdAt: { type: Date, default: Date.now },
 });
