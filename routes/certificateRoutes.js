@@ -134,4 +134,31 @@ router.get('/email-status', async (req, res) => {
   }
 });
 
+// GET certificate by MongoDB _id
+router.get('/:id', async (req, res) => {
+  try {
+    const certificate = await Certificate.findById(req.params.id);
+    if (!certificate) {
+      return res.status(404).json({ message: 'Certificate not found' });
+    }
+    res.json(certificate);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// GET certificate by custom certificateId
+router.get('/by-certificate-id/:certificateId', async (req, res) => {
+  try {
+    const certificate = await Certificate.findOne({ certificateId: req.params.certificateId });
+    if (!certificate) {
+      return res.status(404).json({ message: 'Certificate not found' });
+    }
+    res.json(certificate);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+
 module.exports = router;
