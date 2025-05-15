@@ -29,7 +29,7 @@ async function sendCertificateEmail(to, downloadURL, certificate) {
               Congratulations on successfully completing the <strong>${certificate.courseName}</strong> course!
             </p>
             <p>
-              Your certificate is now ready for download(Certificate Id : ${certificate.certificateId}). Please click the button below to download your certificate (PDF format).
+              Your certificate is now ready for download. Please click the button below to download your certificate (PDF format).
             </p>
 
             <div style="text-align: center; margin: 30px 0;">
