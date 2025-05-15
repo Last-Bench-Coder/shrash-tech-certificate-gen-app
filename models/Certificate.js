@@ -13,7 +13,6 @@ const certificateSchema = new mongoose.Schema({
   instituteLogo: { type: String },
   signatureName: { type: String, trim: true },
   certificateId: { type: String, required: true, unique: true },
-  htmlContent: { type: String }, // Removed `required: true` to allow dynamic setting
   status: { type: String, enum: ['Created', 'Sent', 'Failed'], default: "Created" },
   createdAt: { type: Date, default: Date.now },
 });
